@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Nexus Player</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <style>
+      body {
+        background: #111;
+        color: #fff;
+        font-family: Arial, sans-serif;
+        padding: 20px;
+      }
+
+      video {
+        width: 100%;
+        max-width: 900px;
+        background: black;
+        display: block;
+      }
+
+      .controls {
+        margin-top: 10px;
+      }
+
+      select {
+        padding: 6px 10px;
+        font-size: 14px;
+        background: #222;
+        color: #fff;
+        border: 1px solid #444;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h2>Nexus Streaming Player</h2>
+
+    <video id="video" controls></video>
+
+    <div class="controls">
+      <label for="quality">Quality:</label>
+      <select id="quality">
+        <option value="-1">Auto</option>
+      </select>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
+    <script>
+      const video = document.getElementById("video");
+      const qualitySelector = document.getElementById("quality");
+      let hls;
+
+      if (Hls.isSupported()) {
+        hls = new Hls({
+          // BUFFER CONTROL (IMPORTANT)
+          maxBufferLength: 20,
+          maxMaxBufferLength: 40,
+          backBufferLength: 10,
+
+          // ABR
+          startLevel: -1, // AUTO
+          capLevelToPlayerSize: true,
+
+          // Performance
+          enableWorker: true,
+          lowLatencyMode: false
+        });
+
+        hls.loadSource("master.m3u8");
+        hls.attachMedia(video);
+
+        // Populate quality selector
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          qualitySelector.innerHTML = '<option value="-1">Auto</option>';
+
+          hls.levels.forEach((level, index) => {
+            const option = document.createElement("option");
+            option.value = index;
+            option.text =
+              level.height + "p (" + Math.round(level.bitrate / 1000) + " kbps)";
+            qualitySelector.appendChild(option);
+          });
+        });
+
+        // Handle manual quality change
+        qualitySelector.addEventListener("change", (e) => {
+          const level = parseInt(e.target.value);
+          hls.currentLevel = level; // -1 = auto
+        });
+
+        // STOP network on pause
+        video.addEventListener("pause", () => {
+          hls.stopLoad();
+        });
+
+        // RESUME network on play
+        video.addEventListener("play", () => {
+          hls.startLoad();
+        });
+
+      } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+        video.src = "master.m3u8";
+      } else {
+        alert("HLS not supported");
+      }
+    </script>
+  </body>
+</html>

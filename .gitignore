@@ -1,3 +1,21 @@
+# Binaries
+/bin/
+/dist/
+*.exe
+
+# Media / streaming output
+apps/worker/data/*
+output/
+*.ts
+*.m3u8
+*.mp4
+
+# Env
+.env
+
+# OS junk
+.DS_Store
+
 # Logs
 logs
 *.log
