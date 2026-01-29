@@ -2,20 +2,30 @@ package main
 
 import (
 	"log"
+	"os"
+	// "path/filepath"
+
 	"nexus/worker/internal/ffmpeg"
 )
 
 func main() {
-	log.Println("Worker started")
+	if len(os.Args) < 3 {
+		log.Fatal("usage: worker <inputFilePath> <outputDir>")
+	}
 
-	err := ffmpeg.GenerateHLS(
-		"data/input.mp4",
-		"data/output",
-	)
+	inputPath := os.Args[1]
+	outputDir := os.Args[2]
 
-	if err != nil {
+	// check for optional custom thumbnail
+	var customThumb string
+	if len(os.Args) >= 4 {
+		customThumb = os.Args[3]
+	}
+
+	log.Println("Starting HLS generation...")
+	if err := ffmpeg.GenerateHLS(inputPath, outputDir, customThumb); err != nil {
 		log.Fatal(err)
 	}
 
-	log.Println("Job completed")
+	log.Println("HLS generation completed successfully")
 }

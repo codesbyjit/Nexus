@@ -6,7 +6,7 @@
 # Media / streaming output
 apps/worker/data/*
 output/
-*.ts
+# *.ts
 *.m3u8
 *.mp4
 
@@ -155,3 +155,6 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+#local
+apps/localDrive/*
