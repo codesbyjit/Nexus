@@ -4,7 +4,7 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { writeFile, rm, mkdir } from 'fs/promises';
-import { join } from 'path';
+import path, { join } from 'path';
 import { StorageService } from './storage.service';
 import { spawn } from 'child_process';
 import type { Express } from 'express';
@@ -13,7 +13,7 @@ import * as fs from 'fs';
 @Injectable()
 export class UploadService {
   private readonly BASE_DIR =
-    '/home/jit/codes/recent/Nexus/apps/localDrive';
+    'apps/localstorage';
 
   constructor(private readonly storage: StorageService) {}
 
@@ -83,7 +83,9 @@ export class UploadService {
 
   private runWorker(input: string, output: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      const workerPath = process.env.WORKER_BINARY;
+      // const workerPath = process.env.WORKER_BINARY;
+      const workerPath = "src/worker_bin/worker";
+      console.log(workerPath)
       if (!workerPath) {
         return reject(new Error('WORKER_BINARY env not set'));
       }

@@ -3,10 +3,15 @@ import { VideoService } from './video.service';
 
 @Controller('videos')
 export class VideoController {
-  constructor(private readonly videoService: VideoService) {}
+  constructor(private readonly videoService: VideoService) { }
 
   @Get()
   async getVideos() {
-    return this.videoService.listVideos();
+    try {
+      return await this.videoService.listVideos();
+    } catch (e) {
+      console.error(e);
+      throw e;
+    }
   }
 }

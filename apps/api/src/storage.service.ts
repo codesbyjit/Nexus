@@ -13,7 +13,7 @@ function parseEndpoint(endpoint: string) {
   const url = new URL(endpoint);
   return {
     endPoint: url.hostname,
-    port: Number(url.port) || 9000,
+    port: url.port ? Number(url.port) : (url.protocol === "https:" ? 443 : 80),
     useSSL: url.protocol === "https:",
   };
 }
@@ -28,11 +28,12 @@ export class StorageService {
     );
 
     this.client = new Client({
-      endPoint,
+      endPoint: endPoint,
       port,
       useSSL,
       accessKey: process.env.S3_ACCESS_KEY!,
       secretKey: process.env.S3_SECRET_KEY!,
+      region: process.env.S3_REGION || "us-east-1",
     });
   }
 
@@ -67,7 +68,6 @@ export class StorageService {
           break;
       }
 
-      // Upload text/binary content for small files like .m3u8 or .json
       if (ext === ".m3u8" || ext === ".json") {
         const content = fs.readFileSync(file.full);
         await this.client.putObject(
@@ -78,14 +78,17 @@ export class StorageService {
           { "Content-Type": contentType }
         );
       } else {
-        // Upload file directly for large media files (.ts, .webp, .mp4)
-        await this.client.fPutObject(this.bucketName(), objectName, file.full, { "Content-Type": contentType });
+        await this.client.fPutObject(
+          this.bucketName(),
+          objectName,
+          file.full,
+          { "Content-Type": contentType }
+        );
       }
     }
   }
 
   /* ================= FILE HELPERS ================= */
-
   async exists(objectPath: string): Promise<boolean> {
     try {
       await this.client.statObject(this.bucketName(), objectPath);
@@ -98,7 +101,6 @@ export class StorageService {
 
   async getJson(objectPath: string): Promise<any> {
     const stream = await this.client.getObject(this.bucketName(), objectPath);
-
     return new Promise((resolve, reject) => {
       let data = "";
       stream.on("data", (chunk) => (data += chunk.toString()));
@@ -118,16 +120,21 @@ export class StorageService {
   }
 
   /* ================= LIST PREFIXES ================= */
-
   async listPrefixes(): Promise<string[]> {
     return new Promise((resolve, reject) => {
       const prefixes = new Set<string>();
-      const stream = this.client.listObjectsV2(this.bucketName(), "", true);
+      const stream = this.client.listObjectsV2(
+        this.bucketName(),
+        "",
+        false,
+        "/"
+      );
+
 
       stream.on("data", (obj) => {
-        if (!obj.name) return;
-        const [prefix] = obj.name.split("/");
-        prefixes.add(prefix + "/");
+        if (obj.prefix) {
+          prefixes.add(obj.prefix);
+        }
       });
 
       stream.on("end", () => resolve([...prefixes]));
@@ -136,7 +143,6 @@ export class StorageService {
   }
 
   /* ================= INTERNAL ================= */
-
   private async walk(dir: string, base = dir): Promise<FileEntry[]> {
     const entries = await readdir(dir, { withFileTypes: true });
     const files: FileEntry[] = [];
