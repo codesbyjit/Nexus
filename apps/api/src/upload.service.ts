@@ -2,126 +2,90 @@ import {
   Injectable,
   InternalServerErrorException,
 } from '@nestjs/common';
+
 import { randomUUID } from 'crypto';
-import { writeFile, rm, mkdir } from 'fs/promises';
-import path, { join } from 'path';
-import { StorageService } from './storage.service';
-import { spawn } from 'child_process';
-import type { Express } from 'express';
 import * as fs from 'fs';
+import * as path from 'path';
+import Redis from 'ioredis';
 
 @Injectable()
 export class UploadService {
-  private readonly BASE_DIR =
-    'apps/localstorage';
 
-  constructor(private readonly storage: StorageService) {}
+  private readonly BASE_DIR = path.resolve(
+    process.env.STORAGE_ROOT || './data/storage'
+  );
+
+  private redis: Redis;
+
+  constructor() {
+    this.redis = new Redis(
+      process.env.REDIS_URL || 'redis://127.0.0.1:6379'
+    );
+  }
 
   async handleUpload(
     file: Express.Multer.File,
     title: string,
     description: string,
-    thumbnailFile?: Express.Multer.File,
+    thumbnail?: Express.Multer.File,
   ) {
-    const videoId = randomUUID();
 
-    const inputPath = join(this.BASE_DIR, `${videoId}.mp4`);
-    const outputDir = join(this.BASE_DIR, 'hls', videoId);
-    const thumbPath = join(this.BASE_DIR, `${videoId}_thumb.jpg`);
-    const metaPath = join(this.BASE_DIR, `${videoId}_meta.json`);
+    const id = randomUUID();
+
+    const base = path.join(this.BASE_DIR, id);
+    const raw = path.join(base, 'raw');
+    const input = path.join(raw, 'source.mp4');
 
     try {
-      // ✅ Ensure directories exist
-      await mkdir(this.BASE_DIR, { recursive: true });
-      await mkdir(outputDir, { recursive: true });
+      await fs.promises.mkdir(raw, {
+        recursive: true,
+      });
 
-      // ✅ Save uploaded video
-      await writeFile(inputPath, file.buffer);
+      /* ========== MOVE FILE ========== */
 
-      // ✅ Handle thumbnail
-      if (thumbnailFile) {
-        await writeFile(thumbPath, thumbnailFile.buffer);
-      } else {
-        await this.generateThumbnail(inputPath, thumbPath);
+      await fs.promises.rename(
+        file.path,
+        input,
+      );
+
+      /* ========== VERIFY ========== */
+
+      const stat = await fs.promises.stat(input);
+
+      if (!stat.size) {
+        throw new Error('Empty file');
       }
 
-      // ✅ Save meta.json
-      const meta = { title, description };
-      await writeFile(metaPath, JSON.stringify(meta));
+      /* ========== JOB ========== */
 
-      // ✅ Run worker to generate HLS
-      await this.runWorker(inputPath, outputDir);
+      const job = {
+        id,
+        input,
+        base,
+        title,
+        description,
+        created_at: Date.now(),
+      };
 
-      // ✅ Upload HLS
-      await this.storage.uploadFolder(outputDir, videoId);
+      await this.redis.lpush(
+        'video_jobs',
+        JSON.stringify(job),
+      );
 
-      // ✅ Upload thumbnail
-      await this.storage.uploadFolder(join(this.BASE_DIR), videoId);
-
-      // ✅ Upload meta.json
-      await this.storage.uploadFolder(join(this.BASE_DIR), videoId);
+      console.log('📤 Uploaded:', input);
 
       return {
-        videoId,
-        hlsUrl: this.storage.getPublicUrl(`${videoId}/master.m3u8`),
-        thumbnailUrl: this.storage.getPublicUrl(`${videoId}/${videoId}_thumb.jpg`),
-        metaUrl: this.storage.getPublicUrl(`${videoId}/${videoId}_meta.json`),
+        id,
+        status: 'queued',
       };
+
     } catch (err) {
-      console.error('UploadService error:', err);
+
+      console.error('Upload error:', err);
+
       throw new InternalServerErrorException(
-        'Failed to process video upload',
+        'Upload failed',
       );
-    } finally {
-      // 🧹 Clean up
-      await rm(inputPath, { force: true }).catch(() => {});
-      await rm(outputDir, { recursive: true, force: true }).catch(() => {});
-      await rm(thumbPath, { force: true }).catch(() => {});
-      await rm(metaPath, { force: true }).catch(() => {});
     }
-  }
-
-  private runWorker(input: string, output: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      // const workerPath = process.env.WORKER_BINARY;
-      const workerPath = "src/worker_bin/worker";
-      console.log(workerPath)
-      if (!workerPath) {
-        return reject(new Error('WORKER_BINARY env not set'));
-      }
-
-      const proc = spawn(workerPath, [input, output], {
-        stdio: 'inherit',
-      });
-
-      proc.on('error', reject);
-      proc.on('exit', (code) => {
-        code === 0
-          ? resolve()
-          : reject(new Error(`Worker exited with code ${code}`));
-      });
-    });
-  }
-
-  private generateThumbnail(input: string, output: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const ffmpeg = spawn('ffmpeg', [
-        '-y',
-        '-i',
-        input,
-        '-ss',
-        '00:00:01',
-        '-vframes',
-        '1',
-        '-q:v',
-        '2',
-        output,
-      ]);
-
-      ffmpeg.on('error', reject);
-      ffmpeg.on('exit', (code) => {
-        code === 0 ? resolve() : reject(new Error(`Thumbnail generation failed`));
-      });
-    });
   }
 }

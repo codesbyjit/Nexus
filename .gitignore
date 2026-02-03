@@ -158,3 +158,6 @@ vite.config.ts.timestamp-*
 
 #local
 apps/localDrive/*
+
+apps/api/data/storage/*
+apps/worker/target/

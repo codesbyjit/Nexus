@@ -15,5 +15,14 @@
     "baseUrl": "./",
     "skipLibCheck": true,
     "incremental": true
-  }
+  },
+
+  "exclude": [
+    "node_modules",
+    "dist",
+    "data",
+    "apps/api/data",
+    "storage",
+    "**/*.ts.ts"
+  ]
 }
