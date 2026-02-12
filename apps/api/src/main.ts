@@ -11,9 +11,7 @@ async function bootstrap() {
 
   const port = process.env.PORT || '5000';
   console.log('PORT:', port);
-
-  console.log('WORKER_BINARY:', process.env.WORKER_BINARY);
-
+  // console.log('WORKER_BINARY:', process.env.WORKER_BINARY);
   await app.listen(port);
 }
 bootstrap();

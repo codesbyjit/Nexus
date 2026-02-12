@@ -18,7 +18,9 @@
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.12",
     "@nestjs/platform-express": "^11.1.12",
+    "bullmq": "^5.67.3",
     "dotenv": "^17.2.3",
+    "ioredis": "^5.9.2",
     "minio": "^8.0.6",
     "multer": "^2.0.2",
     "reflect-metadata": "^0.2.2"

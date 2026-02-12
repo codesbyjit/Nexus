@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { UploadModule } from './upload.module';
-import { StorageModule } from './storage.module';
-import { VideoModule } from './video.module';
+import { UploadModule } from './upload/upload.module';
+import { StorageModule } from './storage/storage.module';
+import { VideoModule } from './video/video.module';
 
 @Module({
   imports: [
